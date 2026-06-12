@@ -1,29 +1,22 @@
 import uuid
-import os
-from dotenv import load_dotenv
 import psycopg2
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-import fitz  # This is PyMuPDF
+import fitz  # PyMuPDF
 
+from dotenv import load_dotenv
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from vector_store import embedding_model, get_or_create_collection
+from config import POSTGRES_DB_PARAMS
+from query_engine import retrieve_and_generate
+from model import QueryRequest
 
 load_dotenv()
 app = FastAPI(title="DocuMind RAG Core", version="1.0.0")
 
 # Database Connection Helper Configuration
-DB_PARAMS = {
-    "dbname": "documind_metadata",
-    "user": "documind_user",
-    "password": "documind_password",
-    "host": "localhost",  # Change to "postgres" when dockerized together later
-    "port": "5432"
-}
-
 def get_db_connection():
     """Returns a fresh connection to the PostgreSQL instance."""
-    return psycopg2.connect(**DB_PARAMS)
+    return psycopg2.connect(**POSTGRES_DB_PARAMS)
 
 # Background Task for parsing to prevent blocking the HTTP response thread
 def process_pdf_background(document_id: str, file_bytes: bytes):
@@ -84,9 +77,10 @@ def process_pdf_background(document_id: str, file_bytes: bytes):
             # In the next step, these child_docs will be vectorized and sent to ChromaDB.
             # For now, we will print out the structural relationship to verify our loops work.
             for child_idx, child_content in enumerate(child_docs):
+                print(f"🔄️Embedding is generating fo Child-{child_idx} of Parent-{index}")
                 # generate embedding for this child chunk
                 embedding = embedding_model.embed_query(child_content)
-
+                
                 #append to batch arrays for ChromaDB insertion
                 chroma_ids.append(str(f"{parent_id}_c_{child_idx}"))
                 chroma_embeddings.append(embedding)
@@ -109,7 +103,6 @@ def process_pdf_background(document_id: str, file_bytes: bytes):
         else:            
             print(f"⚠️ No child chunks generated for document {document_id}. Check the text splitting logic.") 
         
-        
         # Update tracking state to completed
         cursor.execute("UPDATE documents SET status = 'COMPLETED' WHERE id = %s;", (document_id,))
         conn.commit()
@@ -126,7 +119,6 @@ def process_pdf_background(document_id: str, file_bytes: bytes):
 
 @app.get("/api/v1/health")
 def health_check():
-    print(f"🔍 Health check endpoint hit.")
     return {
         "status": "healthy", 
         "message": "✅ DocuMind RAG Core is operational."
@@ -173,3 +165,21 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
         "status": "PROCESSING",
         "message": "File accepted successfully. Parsing has started asynchronously."
     }
+
+@app.post("/api/v1/query")
+async def ask_document(payload: QueryRequest):
+    """
+    Receives a natural language question, passes it to the hierarchical 
+    retrieval engine, and returns Gemini's grounded response.
+    """
+    if not payload.query.strip():
+        raise HTTPException(status_code=400, detail="Query text cannot be empty.")
+        
+    try:
+        answer = retrieve_and_generate(payload.query, payload.document_id)
+        return {
+            "query": payload.query,
+            "answer": answer
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query Execution Error: {str(e)}")
