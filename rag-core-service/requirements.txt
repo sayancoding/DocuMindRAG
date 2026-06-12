@@ -1,0 +1,21 @@
+# Web Framework & Execution Async Server
+fastapi
+uvicorn
+pydantic
+python-multipart
+
+# LLM Orchestration & Google Ecosystem
+langchain
+langchain-community
+langchain-google-genai
+
+# Storage Engines & Drivers
+chromadb==0.6.0
+redis
+psycopg2-binary
+
+# Parsing, Math Operations & Advanced RAG Optimizations
+pymupdf
+rank-bm25
+flashrank
+numpy
