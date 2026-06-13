@@ -1,3 +1,24 @@
 spring:
   application:
     name: gateway-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/documind_metadata?serverTimezone=Asia/Kolkata
+    username: documind_user
+    password: documind_password
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+server:
+  port: 8081
+
+  servlet:
+    multipart:
+      enabled: true
+#      max-file-size: 10MB
+#      max-request-size: 10MB
+#  codec:
+#    max-in-memory-size: 10MB
