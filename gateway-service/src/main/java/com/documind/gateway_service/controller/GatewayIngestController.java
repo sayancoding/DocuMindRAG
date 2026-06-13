@@ -1,5 +1,6 @@
 package com.documind.gateway_service.controller;
 
+import com.documind.gateway_service.dto.QueryRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,8 +49,29 @@ public class GatewayIngestController {
                 ));
     }
 
+    @PostMapping(value = "/query", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<ResponseEntity<String>> proxyDocumentQuery(@RequestBody QueryRequest queryPayload) {
+
+        // Input Guardrail Validation
+        if (queryPayload.getQuery() == null || queryPayload.getQuery().trim().isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest().body("{\"error\": \"Query text cannot be empty.\"}"));
+        }
+
+        // Forward JSON payload directly to FastAPI's query engine endpoint
+        return ragCoreWebClient.post()
+                .uri("/api/v1/query")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(queryPayload)
+                .retrieve()
+                .toEntity(String.class)
+                .onErrorResume(error -> Mono.just(
+                        ResponseEntity.status(500)
+                                .body("{\"error\": \"❌ Gateway Query Failure: Downstream AI Core is unreachable. Details: " + error.getMessage() + "\"}")
+                ));
+    }
+
     @GetMapping("/health")
     Mono<String> getHealthCheck(){
-        return Mono.just("DocMind Gateway service is working....");
+        return Mono.just("Running :: DocMind Gateway service is working....");
     }
 }
