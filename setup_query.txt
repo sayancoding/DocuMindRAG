@@ -1,0 +1,26 @@
+-- Create custom enumeration for tracking execution states safely
+CREATE TYPE document_status AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
+
+-- 1. Main Table tracking files uploaded by users
+CREATE TABLE documents (
+    id UUID PRIMARY KEY,
+    file_name VARCHAR(255) NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    status document_status DEFAULT 'PENDING',
+    upload_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    error_message TEXT -- Stores stack trace snippet if status changes to 'FAILED'
+);
+
+-- 2. Meta Table tracking structural layout properties of parent context blocks
+CREATE TABLE document_parents (
+    id UUID PRIMARY KEY,
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    parent_index INT NOT NULL, -- Sequential order of parent block within the document
+    raw_content TEXT NOT NULL,  -- High-fidelity large text window passed to Gemini 2.5 Flash
+    page_start INT,
+    page_end INT
+);
+
+-- Create index on foreign key to optimize search performance
+CREATE INDEX idx_parents_document_id ON document_parents(document_id);

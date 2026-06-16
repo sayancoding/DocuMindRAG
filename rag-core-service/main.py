@@ -176,7 +176,7 @@ async def ask_document(payload: QueryRequest):
         raise HTTPException(status_code=400, detail="Query text cannot be empty.")
         
     try:
-        answer = retrieve_and_generate(payload.query, payload.document_id)
+        answer = retrieve_and_generate(payload.query, payload.documentId)
         return {
             "query": payload.query,
             "answer": answer

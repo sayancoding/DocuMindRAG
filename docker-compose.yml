@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   # 1. Relational Database for Document Registry and System Metadata
@@ -38,6 +38,53 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - documind-network
+
+  # 3. Python FastAPI AI Processing Core
+  rag-core-service:
+    build:
+      context: ./rag-core-service
+      dockerfile: Dockerfile
+    # This instructs Podman to read the .env file directly and copy ALL its contents inside
+    env_file:
+      - ./rag-core-service/.env
+    container_name: documind-rag-core-service
+    ports:
+      - "8080:8080"
+    
+    environment:
+      # - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # Notice how hostnames match container_names for internal service discovery!
+      - DB_HOST=postgres
+      - DB_NAME=documind_metadata
+      - DB_USER=documind_user
+      - DB_PASSWORD=documind_password
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    depends_on:
+      - postgres
+      - chromadb
+    networks:
+      - documind-network
+
+  # 4. Java Spring Boot Enterprise API Gateway
+  gateway-service:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    container_name: documind-api-gateway
+    ports:
+      - "8081:8081"
+    environment:
+      # Routes reactive WebClient directly to the FastAPI container name
+      - RAG_CORE_URL=http://rag-core-service:8080
+      - DB_HOST=postgres  # Points to the container name, NOT localhost!
+      - DB_NAME=documind_metadata
+      - DB_USER=documind_user
+      - DB_PASSWORD=documind_password
+    depends_on:
+      - rag-core-service
     networks:
       - documind-network
 

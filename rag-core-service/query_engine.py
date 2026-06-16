@@ -14,7 +14,7 @@ gemini_client = genai.Client()
 def get_db_connection():
     return psycopg2.connect(**POSTGRES_DB_PARAMS)
 
-def retrieve_and_generate(user_query: str, document_id: str = None):
+def retrieve_and_generate(user_query: str, documentId: str = None):
     """
     Executes Hierarchical Retrieval: Finds matching child vectors,
     swaps them for complete parent contexts from Postgres, and generates an answer.
@@ -26,7 +26,7 @@ def retrieve_and_generate(user_query: str, document_id: str = None):
     collection = get_or_create_collection()
 
     # Construct metadata filter if a specific document_id is passed
-    metadata_filter = {"document_id": document_id} if document_id else None
+    metadata_filter = {"document_id": documentId} if documentId else None
 
     chroma_results = collection.query(
         query_embeddings=[query_vector],
