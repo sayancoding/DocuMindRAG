@@ -76,3 +76,5 @@ venv.bak/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints
+
+/node_modules
