@@ -1,23 +1,37 @@
 package com.documind.gateway_service.controller;
 
 import com.documind.gateway_service.dto.QueryRequest;
+
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 @RestController
 @RequestMapping("/api/gateway")
 @CrossOrigin(origins = "*")
+@Slf4j
 public class GatewayIngestController {
 
     @Autowired
     private WebClient ragCoreWebClient;
+
+    // Sinks map matching an individual file session to a reactive broadcast channel
+    private final Map<String, Sinks.Many<Map<String,Object>>> sessionSinks = new ConcurrentHashMap<>();
 
     @PostMapping(value = "/ingest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<ResponseEntity<String>> proxyDocumentUpload(@RequestPart("file") Mono<FilePart> filePartMono) {
@@ -33,6 +47,8 @@ public class GatewayIngestController {
                     // 2. Build the multipart payload using WebFlux-safe elements
                     MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
                     bodyBuilder.part("file", filePart);
+
+                    sessionSinks.putIfAbsent(filePart.filename(), Sinks.many().multicast().onBackpressureBuffer());
 
                     // 3. Post downstream to the FastAPI core service
                     return ragCoreWebClient.post()
@@ -68,6 +84,53 @@ public class GatewayIngestController {
                         ResponseEntity.status(500)
                                 .body("{\"error\": \"❌ Gateway Query Failure: Downstream AI Core is unreachable. Details: " + error.getMessage() + "\"}")
                 ));
+    }
+
+    /**
+     * 2. SSE WebFlux Stream Route: Angular opens connection here to stream live events
+     */
+    @GetMapping(value = "/stream/{fileName}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<Map<String, Object>>> streamProcessingStatus(@PathVariable String fileName) {
+        Sinks.Many<Map<String, Object>> sink = sessionSinks.get(fileName);
+        
+        if (sink == null) {
+            return Flux.empty();
+        }
+
+        // Convert our reactive Sink channel directly into a live Flux event output stream
+        return sink.asFlux()
+                .map(data -> ServerSentEvent.<Map<String, Object>>builder()
+                        .event("status-update")
+                        .data(data)
+                        .build())
+                .doOnError(err -> sessionSinks.remove(fileName))
+                .doOnCancel(() -> sessionSinks.remove(fileName));
+    }
+
+    /**
+     * Callback endpoint - Get push update from python about file processing.
+     */
+    @PostMapping("/status-callback")
+    public Mono<Void> handleStatusCallback(@RequestBody Map<String, Object> statusPayload) {
+        // Log the received status payload for monitoring
+        log.info("## Received status callback: {}", statusPayload);
+        String fileName = (String) statusPayload.get("fileName");
+        String stage = (String) statusPayload.get("stage");
+
+        Sinks.Many<Map<String, Object>> sink = sessionSinks.get(fileName);
+        if(sink != null) {
+            sink.tryEmitNext(statusPayload);
+
+            if("completed".equalsIgnoreCase(stage) || "failed".equalsIgnoreCase(stage)) {
+                sink.tryEmitComplete();
+                sessionSinks.remove(fileName);
+            }
+        } else {
+            log.warn("No active session found for file: {}", fileName);
+        }
+        
+
+        return Mono.empty();  
     }
 
     @GetMapping("/health")

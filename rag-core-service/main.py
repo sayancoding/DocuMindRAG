@@ -1,6 +1,9 @@
+import os
 import uuid
 import psycopg2
 import fitz  # PyMuPDF
+import asyncio
+import httpx
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
@@ -13,19 +16,22 @@ from model import QueryRequest
 load_dotenv()
 app = FastAPI(title="DocuMind RAG Core", version="1.0.0")
 
+GATEWAY_CALLBACK_URL = f"{os.getenv('GATEWAY_BASE_URL','http://localhost:8081')}/api/gateway/status-callback"
+
 # Database Connection Helper Configuration
 def get_db_connection():
     """Returns a fresh connection to the PostgreSQL instance."""
     return psycopg2.connect(**POSTGRES_DB_PARAMS)
 
 # Background Task for parsing to prevent blocking the HTTP response thread
-def process_pdf_background(document_id: str, file_bytes: bytes):
+async def process_pdf_background(file_name: str, document_id: str, file_bytes: bytes):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         # Open the raw file bytes directly from memory using PyMuPDF
         doc = fitz.open(stream=file_bytes, filetype="pdf")
-        
+        await push_status_to_gateway(file_name, 35, "Reading", "Reading rawPDF text modules...")
+
         # Temporary storage for layout strings
         full_text_accumulator = []
         
@@ -76,8 +82,9 @@ def process_pdf_background(document_id: str, file_bytes: bytes):
             # --- CRUCIAL STEP PREPARATION ---
             # In the next step, these child_docs will be vectorized and sent to ChromaDB.
             # For now, we will print out the structural relationship to verify our loops work.
+            await push_status_to_gateway(file_name, 70, "Embedding", "Embedding Child Chunks...")
             for child_idx, child_content in enumerate(child_docs):
-                print(f"🔄️Embedding is generating fo Child-{child_idx} of Parent-{index}")
+                print(f"🔄️Embedding is generating for Child-{child_idx} of Parent-{index}")
                 # generate embedding for this child chunk
                 embedding = embedding_model.embed_query(child_content)
                 
@@ -91,6 +98,7 @@ def process_pdf_background(document_id: str, file_bytes: bytes):
                 })
 
 
+        await push_status_to_gateway(file_name, 90, "Vector Storage", "Storing vector representations...")
         # 4. Batch insert all child chunks into ChromaDB with their embeddings and metadata
         if chroma_ids:
             collection.add(
@@ -107,7 +115,7 @@ def process_pdf_background(document_id: str, file_bytes: bytes):
         cursor.execute("UPDATE documents SET status = 'COMPLETED' WHERE id = %s;", (document_id,))
         conn.commit()
         print(f"✅ Hierarchical parsing complete for document {document_id}. Generated {len(parent_docs)} Parent blocks.")
-
+        await push_status_to_gateway(file_name, 100, "completed", "Processing complete.")
     except Exception as e:
         conn.rollback()
         cursor.execute("UPDATE documents SET status = 'FAILED', error_message = %s WHERE id = %s;", (str(e), document_id))
@@ -116,6 +124,36 @@ def process_pdf_background(document_id: str, file_bytes: bytes):
     finally:
         cursor.close()
         conn.close()
+
+async def push_status_to_gateway(file_name: str, progress: int, stage: str, status_text: str):
+    """Pushes a state event up to the Spring Boot Gateway callback lane."""
+    payload = {
+        "fileName": file_name,
+        "progress": progress,
+        "stage": stage,
+        "statusText": status_text
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(GATEWAY_CALLBACK_URL, json=payload)
+    except Exception as e:
+        print(f"❌ Failed to deliver SSE status callback update: {str(e)}")
+
+# async def background_pdf_processor(file_name: str, file_bytes: bytes):
+#     try:
+#         # Phase 1: Landed on Disk -> Extracting text
+#         await push_status_to_gateway(file_name, 35, "extracting", "Parsing PDF text modules...")
+#         await asyncio.sleep(1.5) # Simulating processing workload
+        
+#         # Phase 2: Building Vectors -> Embedding via Gemini
+#         await push_status_to_gateway(file_name, 70, "embedding", "Generating vector matrices via Gemini...")
+#         await asyncio.sleep(2.0) # Simulating Gemini API processing latency
+        
+#         # Phase 3: Final Integration Completed Successfully
+#         await push_status_to_gateway(file_name, 100, "completed", "Processed")
+        
+#     except Exception as e:
+#         await push_status_to_gateway(file_name, 100, "failed", f"Processing error: {str(e)}")
 
 @app.get("/api/v1/health")
 def health_check():
@@ -158,7 +196,7 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
         conn.close()
 
     # Offload extraction to a background thread so the client gets an instant response
-    background_tasks.add_task(process_pdf_background, document_id, file_bytes)
+    background_tasks.add_task(process_pdf_background, file.filename, document_id, file_bytes)
 
     return {
         "document_id": document_id,
