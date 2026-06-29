@@ -30,7 +30,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
     try:
         # Open the raw file bytes directly from memory using PyMuPDF
         doc = fitz.open(stream=file_bytes, filetype="pdf")
-        await push_status_to_gateway(file_name, 35, "Reading", "Reading rawPDF text modules...")
+        await push_status_to_gateway(file_name, 35, "extracting", "Reading rawPDF text modules...")
 
         # Temporary storage for layout strings
         full_text_accumulator = []
@@ -82,7 +82,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
             # --- CRUCIAL STEP PREPARATION ---
             # In the next step, these child_docs will be vectorized and sent to ChromaDB.
             # For now, we will print out the structural relationship to verify our loops work.
-            await push_status_to_gateway(file_name, 70, "Embedding", "Embedding Child Chunks...")
+            await push_status_to_gateway(file_name, 70, "embedding", "Embedding Child Chunks...")
             for child_idx, child_content in enumerate(child_docs):
                 print(f"🔄️Embedding is generating for Child-{child_idx} of Parent-{index}")
                 # generate embedding for this child chunk
@@ -98,7 +98,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
                 })
 
 
-        await push_status_to_gateway(file_name, 90, "Vector Storage", "Storing vector representations...")
+        await push_status_to_gateway(file_name, 90, "vectorizing", "Storing vector representations...")
         # 4. Batch insert all child chunks into ChromaDB with their embeddings and metadata
         if chroma_ids:
             collection.add(
