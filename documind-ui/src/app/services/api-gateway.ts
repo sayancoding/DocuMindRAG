@@ -1,8 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, filter, map } from 'rxjs';
 import { DocumentItem } from '../models/DocumentItem';
 import { ChatMessage } from '../models/ChatMessage';
+import { Docs } from '../models/Docs';
 
 @Injectable({
   providedIn: 'root'
@@ -101,6 +102,21 @@ export class ApiGateway {
       currentActive[fileName].statusText = errorMsg;
       this.activeUploadsSubject.next(currentActive);
     }
+  }
+
+  docs: Docs[] = [];
+  fetchDocumentsRoster(): void {  
+    this.http.get<Docs[]>(`${this.gatewayBaseUrl}/documents`).pipe(
+      map(docs => docs.filter(doc => doc.status === 'COMPLETE'))
+    ).subscribe({
+      next: (data) => {
+        this.docs = data;
+      },
+      error: () => {
+        console.error('Failed to fetch documents roster');
+      }
+    });
+    
   }
 
   // CHAT PART

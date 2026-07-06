@@ -1,9 +1,12 @@
 package com.documind.gateway_service.controller;
 
+import com.documind.gateway_service.dto.DocumentDto;
+import com.documind.gateway_service.dto.DocumentResponse;
 import com.documind.gateway_service.dto.QueryRequest;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -131,6 +134,16 @@ public class GatewayIngestController {
         
 
         return Mono.empty();  
+    }
+
+    @GetMapping ("/documents")
+    Mono<ResponseEntity<List<DocumentDto>>> getAllDocs(){
+        return ragCoreWebClient.get()
+                .uri("/api/v1/documents")
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(DocumentResponse.class)
+                .map(el -> ResponseEntity.ok(el.documents()));
     }
 
     @GetMapping("/health")

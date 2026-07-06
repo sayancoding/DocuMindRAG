@@ -221,3 +221,31 @@ async def ask_document(payload: QueryRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query Execution Error: {str(e)}")
+
+
+@app.get("/api/v1/documents")
+def list_documents():
+    """
+    Returns a list of all documents in the PostgreSQL registry with their current status.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, file_name, file_size_bytes, content_type, status FROM documents;")
+        rows = cursor.fetchall()
+        documents = [
+            {
+                "id": row[0],
+                "file_name": row[1],
+                "file_size_bytes": row[2],
+                "content_type": row[3],
+                "status": row[4]
+            }
+            for row in rows
+        ]
+        return {"documents": documents}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database Retrieval Error: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
