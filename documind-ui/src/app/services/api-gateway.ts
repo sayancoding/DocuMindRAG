@@ -24,6 +24,7 @@ export class ApiGateway {
     formData.append('file', file);
 
     const initialJob: DocumentItem = {
+      id: "",
       name: file.name,
       date: 'Today',
       progress: 10,
@@ -41,7 +42,7 @@ export class ApiGateway {
         this.establishSseConnection(file.name);
       },
       error: () => {
-        this.handleFailure(file.name, 'Upload failed');
+        this.handleFailure(file.name, 'Upload failed',"");
       }
     });
   }
@@ -55,16 +56,17 @@ export class ApiGateway {
       
       // 🌟 No zone wrapper needed! Just update the value stream directly
       if (data.stage === 'completed') {
-        this.moveToRoster(data.fileName);
+        this.moveToRoster(data.fileName,data.document_id);
         eventSource.close();
       } else if (data.stage === 'failed') {
-        this.handleFailure(data.fileName, data.statusText);
+        this.handleFailure(data.fileName, data.statusText,data.document_id);
         eventSource.close();
       } else {
         const currentActive = this.activeUploadsSubject.value;
         this.activeUploadsSubject.next({
           ...currentActive,
           [data.fileName]: {
+            document_id: data.document_id,
             name: data.fileName,
             date: 'Today',
             progress: data.progress,
@@ -78,11 +80,12 @@ export class ApiGateway {
     eventSource.onerror = () => eventSource.close();
   }
 
-  private moveToRoster(fileName: string): void {
+  private moveToRoster(fileName: string,document_id:string): void {
     const currentActive = { ...this.activeUploadsSubject.value };
     const completedJob = currentActive[fileName];
     
     if (completedJob) {
+      completedJob.id = document_id;
       completedJob.stage = 'completed';
       completedJob.progress = 100;
       completedJob.statusText = 'Processed';
@@ -95,22 +98,31 @@ export class ApiGateway {
       this.rosterSubject.next([completedJob, ...this.rosterSubject.value]);
     }
   }
-  private handleFailure(fileName: string, errorMsg: string): void {
+  private handleFailure(fileName: string, errorMsg: string, document_id:string): void {
     const currentActive = { ...this.activeUploadsSubject.value };
     if (currentActive[fileName]) {
+      currentActive[fileName].id = document_id;
       currentActive[fileName].stage = 'failed';
       currentActive[fileName].statusText = errorMsg;
       this.activeUploadsSubject.next(currentActive);
     }
   }
 
-  docs: Docs[] = [];
+  
   fetchDocumentsRoster(): void {  
+    let documents:DocumentItem[] = [];
+
     this.http.get<Docs[]>(`${this.gatewayBaseUrl}/documents`).pipe(
       map(docs => docs.filter(doc => doc.status === 'COMPLETE'))
     ).subscribe({
       next: (data) => {
-        this.docs = data;
+        
+        data.forEach(el => {
+          documents = this.rosterSubject.getValue();
+          let newDoc:DocumentItem = {id:el.id,name:el.file_name,date:"TODAY",progress:100,stage:'completed',statusText:""};
+
+          this.rosterSubject.next([...documents,newDoc]);
+        })
       },
       error: () => {
         console.error('Failed to fetch documents roster');
@@ -165,4 +177,6 @@ export class ApiGateway {
       }
     });
   }
+
+  
 }

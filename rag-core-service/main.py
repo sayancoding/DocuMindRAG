@@ -30,7 +30,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
     try:
         # Open the raw file bytes directly from memory using PyMuPDF
         doc = fitz.open(stream=file_bytes, filetype="pdf")
-        await push_status_to_gateway(file_name, 35, "extracting", "Reading rawPDF text modules...")
+        await push_status_to_gateway(document_id,file_name, 35, "extracting", "Reading rawPDF text modules...")
 
         # Temporary storage for layout strings
         full_text_accumulator = []
@@ -82,7 +82,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
             # --- CRUCIAL STEP PREPARATION ---
             # In the next step, these child_docs will be vectorized and sent to ChromaDB.
             # For now, we will print out the structural relationship to verify our loops work.
-            await push_status_to_gateway(file_name, 70, "embedding", "Embedding Child Chunks...")
+            await push_status_to_gateway(document_id,file_name, 70, "embedding", "Embedding Child Chunks...")
             for child_idx, child_content in enumerate(child_docs):
                 print(f"🔄️Embedding is generating for Child-{child_idx} of Parent-{index}")
                 # generate embedding for this child chunk
@@ -98,7 +98,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
                 })
 
 
-        await push_status_to_gateway(file_name, 90, "vectorizing", "Storing vector representations...")
+        await push_status_to_gateway(document_id,file_name, 90, "vectorizing", "Storing vector representations...")
         # 4. Batch insert all child chunks into ChromaDB with their embeddings and metadata
         if chroma_ids:
             collection.add(
@@ -115,19 +115,21 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
         cursor.execute("UPDATE documents SET status = 'COMPLETED' WHERE id = %s;", (document_id,))
         conn.commit()
         print(f"✅ Hierarchical parsing complete for document {document_id}. Generated {len(parent_docs)} Parent blocks.")
-        await push_status_to_gateway(file_name, 100, "completed", "Processing complete.")
+        await push_status_to_gateway(document_id,file_name, 100, "completed", "Processing complete.")
     except Exception as e:
         conn.rollback()
         cursor.execute("UPDATE documents SET status = 'FAILED', error_message = %s WHERE id = %s;", (str(e), document_id))
         conn.commit()
         print(f"❌ Error in background processing: {str(e)}")
+        await push_status_to_gateway(document_id,file_name, 100, "failed", "Processing failed.")
     finally:
         cursor.close()
         conn.close()
 
-async def push_status_to_gateway(file_name: str, progress: int, stage: str, status_text: str):
+async def push_status_to_gateway(id: str, file_name: str, progress: int, stage: str, status_text: str):
     """Pushes a state event up to the Spring Boot Gateway callback lane."""
     payload = {
+        "document_id" : id,
         "fileName": file_name,
         "progress": progress,
         "stage": stage,

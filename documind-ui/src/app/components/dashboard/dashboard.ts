@@ -18,7 +18,7 @@ export class Dashboard {
   completedRoster$ = this.apiGateway.documentsRoster$;
 
   ngOnInit(): void {
-    
+    this.apiGateway.fetchDocumentsRoster();
   }
 
   // Captures file selection from standard input click click

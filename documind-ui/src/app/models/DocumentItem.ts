@@ -1,4 +1,5 @@
 export interface DocumentItem {
+  id: string;
   name: string;
   date: string;
   progress: number;
