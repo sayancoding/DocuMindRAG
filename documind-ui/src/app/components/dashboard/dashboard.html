@@ -4,7 +4,10 @@
       <div class="font-semibold">
         <!-- Custom Dropdown -->
         <div class="relative">
-          <button (click)="toggleModelSelectionDropdown()" class="w-full border border-slate-200 rounded-lg px-2 py-1 flex items-center gap-2 text-sm bg-white shadow-sm cursor-pointer">
+          <button
+            (click)="toggleModelSelectionDropdown()"
+            class="w-full border border-slate-200 rounded-lg px-2 py-1 flex items-center gap-2 text-sm bg-white shadow-sm cursor-pointer"
+          >
             <span class="material-symbols-outlined"> network_intel_node </span>
             <span>Select Model</span>
             <span class="material-symbols-outlined text-xs"> expand_more </span>
@@ -12,38 +15,56 @@
           <!-- Dropdown Menu (conditionally shown) -->
           <div
             [class.hidden]="!modelSelectionDropdownOpen"
-           class="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-20">
-            <button class="w-full text-left px-3 py-2 flex items-center gap-2 text-sm hover:bg-slate-50">
+            class="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-20"
+          >
+            <button
+              class="w-full text-left px-3 py-2 flex items-center gap-2 text-sm hover:bg-slate-50"
+            >
               <span class="material-symbols-outlined"> network_intel_node </span>
               <span>Gemini 2.5 Flash</span>
             </button>
             <!-- Add more options here -->
           </div>
         </div>
-      
       </div>
       <span class="text-slate-300">•</span>
-      
+
       <div class="font-semibold">
         <!-- Custom Dropdown -->
         <div class="relative">
-          <button (click)="toggleDocumentSelectionDropdown()" class="w-full border border-slate-200 rounded-lg px-2 py-1 flex items-center gap-2 text-sm bg-white shadow-sm cursor-pointer">
+          <button
+            (click)="toggleDocumentSelectionDropdown()"
+            class="w-full border border-slate-200 rounded-lg px-2 py-1 flex items-center gap-2 text-sm bg-white shadow-sm cursor-pointer"
+          >
             <span class="material-symbols-outlined"> article_shortcut </span>
-            <span>Select Document</span>
+            @if (activeDocName) {
+              <span class="truncate" [title]="activeDocName">{{ activeDocName }}</span>
+            } @else {
+              <span class="truncate" title="Select Document">Select Document</span>
+            }
             <span class="material-symbols-outlined text-xs"> expand_more </span>
           </button>
           <!-- Dropdown Menu (conditionally shown) -->
           <div
             [class.hidden]="!documentSelectionDropdownOpen"
-           class="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-20">
-            <button class="w-full text-left px-3 py-2 flex items-center gap-2 text-sm hover:bg-slate-50">
-              
-              <span>Document 1</span>
-            </button>
+            class="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-20"
+          >
+            <div
+              class="w-full text-left px-3 py-2 flex items-center gap-2 text-sm hover:bg-slate-50"
+            >
+              @for (doc of completedRoster$ | async; track doc.id) {
+                <button
+                  (click)="selectDocument(doc.id, doc.name)"
+                  class="w-full text-left px-3 py-2 flex items-center gap-2 text-sm hover:bg-slate-50 "
+                  [class.text-indigo-600]="activeDocId === doc.id"
+                >
+                  {{ doc.name }}
+                </button>
+              }
+            </div>
             <!-- Add more options here -->
           </div>
         </div>
-      
       </div>
     </div>
 
@@ -83,15 +104,16 @@
       >
         <input
           type="text"
-          [(ngModel)]="userQuery" 
-         (keydown.enter)="sendMessage()"
+          [(ngModel)]="userQuery"
+          (keydown.enter)="sendMessage()"
           placeholder="Type a message..."
           class="w-full bg-transparent py-4 pl-4 pr-12 outline-none text-sm text-slate-800"
         />
-        <button 
-        (click)="sendMessage()"
-        [disabled]="!userQuery.trim()"
-        class="absolute right-3 p-2 text-slate-400 hover:text-indigo-600 transition">
+        <button
+          (click)="sendMessage()"
+          [disabled]="!userQuery.trim() || !activeDocId"
+          class="absolute right-3 p-2 text-indigo-600 transition disabled:text-slate-400"
+        >
           <span class="material-symbols-outlined"> send </span>
         </button>
       </div>

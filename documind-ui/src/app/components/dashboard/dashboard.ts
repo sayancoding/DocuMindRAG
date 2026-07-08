@@ -34,8 +34,6 @@ export class Dashboard {
   }
 
   userQuery = '';
-  selectedDocumentId: string | null = "057a6268-78ed-4c12-b76a-53d576bc3f7a"; 
-
   // Expose the raw messages subject observable stream straight to your HTML template layout
   conversation$ = this.apiGateway.messages$;
 
@@ -44,11 +42,14 @@ export class Dashboard {
     if (!rawText) return;
 
     // Trigger our non-streaming HTTP post pipeline
-    this.apiGateway.askRagQuestionNormal(rawText, this.selectedDocumentId);
+    this.apiGateway.askRagQuestionNormal(rawText, this.activeDocId);
     
     // Instantly wipe the text area clean for the next user question
     this.userQuery = '';
   }
+
+  activeDocId: string | null = null;
+  activeDocName: string | null = null;
 
   documentSelectionDropdownOpen = false;
   modelSelectionDropdownOpen = false;
@@ -58,6 +59,12 @@ export class Dashboard {
   }
   toggleModelSelectionDropdown(): void {
     this.modelSelectionDropdownOpen = !this.modelSelectionDropdownOpen;
+  }
+
+  selectDocument(docId: string | null, docName: string | null): void {
+    this.activeDocId = docId;
+    this.activeDocName = docName;
+    this.documentSelectionDropdownOpen = false; // Auto-close overlay tray after selection
   }
 
 }

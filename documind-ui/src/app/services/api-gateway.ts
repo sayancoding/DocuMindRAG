@@ -111,12 +111,13 @@ export class ApiGateway {
   
   fetchDocumentsRoster(): void {  
     let documents:DocumentItem[] = [];
-
+    this.rosterSubject.next([]);
+    console.log('Fetching documents roster from API Gateway...');
     this.http.get<Docs[]>(`${this.gatewayBaseUrl}/documents`).pipe(
-      map(docs => docs.filter(doc => doc.status === 'COMPLETE'))
+      map(docs => docs.filter(doc => doc.status === 'COMPLETED'))
     ).subscribe({
       next: (data) => {
-        
+        console.log('Fetched documents roster:', data);
         data.forEach(el => {
           documents = this.rosterSubject.getValue();
           let newDoc:DocumentItem = {id:el.id,name:el.file_name,date:"TODAY",progress:100,stage:'completed',statusText:""};
