@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: documind_password
       POSTGRES_DB: documind_metadata
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -52,7 +52,6 @@ services:
     container_name: documind-rag-core-service
     ports:
       - "8080:8080"
-    
     environment:
       # - GEMINI_API_KEY=${GEMINI_API_KEY}
       # Notice how hostnames match container_names for internal service discovery!
