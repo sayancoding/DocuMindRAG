@@ -3,10 +3,11 @@ import { DocumentItem } from '../../models/DocumentItem';
 import { ApiGateway } from '../../services/api-gateway';
 import { AsyncPipe, CommonModule, KeyValuePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Chat } from "../chat/chat";
 
 @Component({
   selector: 'app-dashboard',
-  imports: [KeyValuePipe,CommonModule,AsyncPipe,FormsModule],
+  imports: [KeyValuePipe, CommonModule, AsyncPipe, FormsModule, Chat],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
 })

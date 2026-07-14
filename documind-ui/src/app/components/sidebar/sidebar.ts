@@ -9,6 +9,7 @@ import { RouterLink } from "@angular/router";
 })
 export class Sidebar {
   currentWorkspace = signal('dashboard'); 
+  toggleOptionsPopup = signal(false);
 
   sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'clock_loader_60' },
@@ -18,5 +19,9 @@ export class Sidebar {
 
   setWorkspace(viewId: string): void {
     this.currentWorkspace.set(viewId);
+  }
+
+  setToggleOptionsPopup(): void {
+    this.toggleOptionsPopup.set(!this.toggleOptionsPopup());
   }
 }
