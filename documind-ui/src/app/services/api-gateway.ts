@@ -179,5 +179,19 @@ export class ApiGateway {
     });
   }
 
-  
+  deleteDocument(documentId: string): void {
+    this.http.delete(`${this.gatewayBaseUrl}/documents/${documentId}`).subscribe({
+      next: () => {
+        // Remove the document from the roster  
+        const currentRoster = this.rosterSubject.getValue();
+        const updatedRoster = currentRoster.filter(doc => doc.id !== documentId);
+        this.rosterSubject.next(updatedRoster);
+        console.log(`Deleted document with ID: ${documentId}`);
+      },
+      error: () => {
+        console.error(`Failed to delete document with ID: ${documentId}`);
+      }
+    });
+  }
+
 }

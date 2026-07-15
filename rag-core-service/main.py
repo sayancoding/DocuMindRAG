@@ -236,3 +236,36 @@ def list_documents():
     finally:
         cursor.close()
         conn.close()
+
+@app.delete("/api/v1/documents/{document_id}")
+def delete_document(document_id: str):
+    """
+    Deletes a document and its associated child chunks from both PostgreSQL and ChromaDB.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+
+        # Step 0: Delete associated parent records from PostgreSQL
+        cursor.execute("DELETE FROM document_parents WHERE document_id = %s RETURNING id;", (document_id,))
+        deleted_rows = cursor.fetchall()
+
+        # Step 1: Delete the main document record from PostgreSQL
+        cursor.execute("DELETE FROM documents WHERE id = %s RETURNING id;", (document_id,))
+        deleted_row = cursor.fetchone()
+
+        if not deleted_row and not deleted_rows:
+            raise HTTPException(status_code=404, detail="Document not found in registry.")
+        
+        # Step 2: Delete associated child chunks from ChromaDB
+        collection = get_or_create_collection()
+        collection.delete(where={"document_id": document_id})
+        
+        conn.commit()
+        return {"message": f"Document {document_id} and its child chunks have been deleted successfully."}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Deletion Error: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()

@@ -8,13 +8,13 @@ import { RouterLink } from "@angular/router";
   styleUrl: './sidebar.css',
 })
 export class Sidebar {
-  currentWorkspace = signal('dashboard'); 
+  currentWorkspace = signal('documents'); 
   toggleOptionsPopup = signal(false);
 
   sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'clock_loader_60' },
     { id: 'chat', label: 'Chat', icon: 'chat' },
-    { id: 'documents', label: 'My Documents', icon: 'folder' }
+    { id: 'documents', label: 'Documents', icon: 'folder' }
   ];
 
   setWorkspace(viewId: string): void {

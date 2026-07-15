@@ -1,16 +1,10 @@
 <div class="h-screen w-full overflow-hidden flex">
     <div class="space-y-3 flex-2 flex flex-col py-4 px-8">
-      <div
-        class="flex justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1"
-      >
-        <span>Document</span>
-        <div class="flex gap-8">
-          <span>Date</span>
-          <span>Status</span>
-        </div>
+      <div class="flex items-center justify-between">
+        <p class="text-lg font-semibold ">Processed Documents  <span class="text-indigo-700 bg-indigo-100 px-2 rounded-full">{{ (completedRoster$ | async)?.length }}</span></p>
+        <input type="text" placeholder="Search documents..." class="border w-2/5 border-slate-300 focus:ring-2 focus:ring-indigo-400  focus:outline-none py-1 px-2 rounded-md">
       </div>
-
-      <div class="space-y-1 overflow-y-auto flex-1 pr-1">
+      <div class="space-y-1 overflow-y-auto font-semibold  pr-1">
         @for (doc of completedRoster$ | async; track doc.name) {
           <div
             class="flex justify-between items-center text-xs p-2 hover:bg-slate-50 rounded-lg transition text-slate-600 group"
@@ -34,6 +28,11 @@
                   ✕ Failed
                 </span>
               }
+              <span class="material-symbols-outlined text-[14px] text-slate-400 group-hover:text-red-600 transition cursor-pointer"
+                (click)="deleteDocument(doc.id)"
+              >
+                delete
+              </span>
             </div>
           </div>
         } @empty {

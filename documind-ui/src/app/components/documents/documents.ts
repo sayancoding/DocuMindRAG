@@ -30,4 +30,8 @@ export class Documents {
   triggerSelect(inputRef: HTMLInputElement): void {
     inputRef.click();
   }
+
+  deleteDocument(documentId: string): void {
+    this.apiGateway.deleteDocument(documentId);
+  }
 }
