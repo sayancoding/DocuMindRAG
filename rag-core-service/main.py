@@ -30,7 +30,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
     try:
         # Open the raw file bytes directly from memory using PyMuPDF
         doc = fitz.open(stream=file_bytes, filetype="pdf")
-        await push_status_to_gateway(document_id, file_name, 35, "extracting", "Reading rawPDF text modules...")
+        await push_status_to_gateway(document_id, file_name, 10, "extracting", "Reading PDF Content...")
 
         # Temporary storage for layout strings
         full_text_accumulator = []
@@ -64,6 +64,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
         chroma_documents = []
         chroma_metadatas = []
         
+        await push_status_to_gateway(document_id, file_name, 20, "embedding", f"Started Embedding {len(parent_docs)} Parent Chunks...")
         # 2. Loop through Parent Chunks and write them to PostgreSQL
         for index, parent_content in enumerate(parent_docs):
             parent_id = str(uuid.uuid4())
@@ -82,7 +83,8 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
             # --- CRUCIAL STEP PREPARATION ---
             # In the next step, these child_docs will be vectorized and sent to ChromaDB.
             # For now, we will print out the structural relationship to verify our loops work.
-            await push_status_to_gateway(document_id, file_name, 70, "embedding", "Embedding Child Chunks...")
+            await push_status_to_gateway(document_id, file_name, (30 + int(index/len(parent_docs)*70)), "embedding", f"Embedding of Parent-{index}")
+                
             for child_idx, child_content in enumerate(child_docs):
                 print(f"## Embedding is generating for Child-{child_idx} of Parent-{index}")
                 # generate embedding for this child chunk
@@ -98,7 +100,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
                 })
 
 
-        await push_status_to_gateway(document_id, file_name, 90, "vectorizing", "Storing vector representations...")
+        await push_status_to_gateway(document_id, file_name, 98, "vectorizing", f"Storing vector {len(chroma_ids)} representations...")
         # 4. Batch insert all child chunks into ChromaDB with their embeddings and metadata
         if chroma_ids:
             collection.add(
