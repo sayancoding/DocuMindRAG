@@ -30,7 +30,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
     try:
         # Open the raw file bytes directly from memory using PyMuPDF
         doc = fitz.open(stream=file_bytes, filetype="pdf")
-        await push_status_to_gateway(document_id, file_name, 35, "extracting", "Reading rawPDF text modules...")
+        await push_status_to_gateway(document_id, file_name, 10, "extracting", "Reading PDF Content...")
 
         # Temporary storage for layout strings
         full_text_accumulator = []
@@ -64,6 +64,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
         chroma_documents = []
         chroma_metadatas = []
         
+        await push_status_to_gateway(document_id, file_name, 20, "embedding", f"Started Embedding {len(parent_docs)} Parent Chunks...")
         # 2. Loop through Parent Chunks and write them to PostgreSQL
         for index, parent_content in enumerate(parent_docs):
             parent_id = str(uuid.uuid4())
@@ -82,7 +83,8 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
             # --- CRUCIAL STEP PREPARATION ---
             # In the next step, these child_docs will be vectorized and sent to ChromaDB.
             # For now, we will print out the structural relationship to verify our loops work.
-            await push_status_to_gateway(document_id, file_name, 70, "embedding", "Embedding Child Chunks...")
+            await push_status_to_gateway(document_id, file_name, (30 + int(index/len(parent_docs)*70)), "embedding", f"Embedding of Parent-{index}")
+                
             for child_idx, child_content in enumerate(child_docs):
                 print(f"## Embedding is generating for Child-{child_idx} of Parent-{index}")
                 # generate embedding for this child chunk
@@ -98,7 +100,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
                 })
 
 
-        await push_status_to_gateway(document_id, file_name, 90, "vectorizing", "Storing vector representations...")
+        await push_status_to_gateway(document_id, file_name, 98, "vectorizing", f"Storing vector {len(chroma_ids)} representations...")
         # 4. Batch insert all child chunks into ChromaDB with their embeddings and metadata
         if chroma_ids:
             collection.add(
@@ -233,6 +235,39 @@ def list_documents():
         return {"documents": documents}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database Retrieval Error: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.delete("/api/v1/documents/{document_id}")
+def delete_document(document_id: str):
+    """
+    Deletes a document and its associated child chunks from both PostgreSQL and ChromaDB.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+
+        # Step 0: Delete associated parent records from PostgreSQL
+        cursor.execute("DELETE FROM document_parents WHERE document_id = %s RETURNING id;", (document_id,))
+        deleted_rows = cursor.fetchall()
+
+        # Step 1: Delete the main document record from PostgreSQL
+        cursor.execute("DELETE FROM documents WHERE id = %s RETURNING id;", (document_id,))
+        deleted_row = cursor.fetchone()
+
+        if not deleted_row and not deleted_rows:
+            raise HTTPException(status_code=404, detail="Document not found in registry.")
+        
+        # Step 2: Delete associated child chunks from ChromaDB
+        collection = get_or_create_collection()
+        collection.delete(where={"document_id": document_id})
+        
+        conn.commit()
+        return {"message": f"Document {document_id} and its child chunks have been deleted successfully."}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Deletion Error: {str(e)}")
     finally:
         cursor.close()
         conn.close()
