@@ -41,57 +41,103 @@ services:
     networks:
       - documind-network
 
-  # 3. Python FastAPI AI Processing Core
-  rag-core-service:
-    build:
-      context: ./rag-core-service
-      dockerfile: Dockerfile
-    # This instructs Podman to read the .env file directly and copy ALL its contents inside
-    env_file:
-      - ./rag-core-service/.env
-    container_name: documind-rag-core-service
+  # ==========================================
+  # Apache Kafka (KRaft Mode - Fixed Listeners)
+  # ==========================================
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: documind-kafka
     ports:
-      - "8080:8080"
-    environment:
-      # - GEMINI_API_KEY=${GEMINI_API_KEY}
-      # Notice how hostnames match container_names for internal service discovery!
-      - DB_HOST=postgres
-      - DB_NAME=documind_metadata
-      - DB_USER=documind_user
-      - DB_PASSWORD=documind_password
-      - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
-      - GATEWAY_BASE_URL=http://gateway-service:8081
-    depends_on:
-      - postgres
-      - chromadb
+      - "9092:9092"  # Host machine access (IntelliJ / Postman / Local Spring Boot)
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     networks:
       - documind-network
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # INTERNAL on 9093 (for Docker containers), EXTERNAL on 9092 (for host/IDE), CONTROLLER on 9094
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9094
+      # Advertised: Docker containers talk to 'kafka:9093', Host talks to 'localhost:9092'
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9093,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+
+  # ==========================================
+  # Kafka UI (Web Management Dashboard)
+  # ==========================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: documind-kafka-ui
+    ports:
+      - "8085:8080"   # Access UI at http://localhost:8085
+    networks:
+      - documind-network
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=documind-local-cluster
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9093
+    depends_on:
+      - kafka
 
   # 4. Java Spring Boot Enterprise API Gateway
-  gateway-service:
-    build:
-      context: ./gateway-service
-      dockerfile: Dockerfile
-    container_name: documind-api-gateway
-    ports:
-      - "8081:8081"
-    environment:
-      # Routes reactive WebClient directly to the FastAPI container name
-      - RAG_CORE_URL=http://rag-core-service:8080
-      - DB_HOST=postgres  # Points to the container name, NOT localhost!
-      - DB_NAME=documind_metadata
-      - DB_USER=documind_user
-      - DB_PASSWORD=documind_password
-    depends_on:
-      - rag-core-service
-    networks:
-      - documind-network
+  # gateway-service:
+  #   build:
+  #     context: ./gateway-service
+  #     dockerfile: Dockerfile
+  #   container_name: documind-api-gateway
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     # Routes reactive WebClient directly to the FastAPI container name
+  #     - RAG_CORE_URL=http://rag-core-service:8080
+  #     - DB_HOST=postgres  # Points to the container name, NOT localhost!
+  #     - DB_NAME=documind_metadata
+  #     - DB_USER=documind_user
+  #     - DB_PASSWORD=documind_password
+  #   depends_on:
+  #     - rag-core-service
+  #   networks:
+  #     - documind-network
+
+  # 3. Python FastAPI AI Processing Core
+  # rag-core-service:
+  #   build:
+  #     context: ./rag-core-service
+  #     dockerfile: Dockerfile
+  #   # This instructs Podman to read the .env file directly and copy ALL its contents inside
+  #   env_file:
+  #     - ./rag-core-service/.env
+  #   container_name: documind-rag-core-service
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     # - GEMINI_API_KEY=${GEMINI_API_KEY}
+  #     # Notice how hostnames match container_names for internal service discovery!
+  #     - DB_HOST=postgres
+  #     - DB_NAME=documind_metadata
+  #     - DB_USER=documind_user
+  #     - DB_PASSWORD=documind_password
+  #     - CHROMA_HOST=chromadb
+  #     - CHROMA_PORT=8000
+  #     - GATEWAY_BASE_URL=http://gateway-service:8081
+  #   depends_on:
+  #     - postgres
+  #     - chromadb
+  #   networks:
+  #     - documind-network
 
 volumes:
   postgres_data:
   chroma_data:
   redis_data:
+  kafka_data:
 
 networks:
   documind-network:

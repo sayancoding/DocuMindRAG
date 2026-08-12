@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: ingestion-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:documind_metadata}?serverTimezone=Asia/Kolkata
+    username: ${DB_USER:documind_user}
+    password: ${DB_PASSWORD:documind_password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  kafka:
+    topic:
+      document-ingested: document-ingestion-events
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+    properties:
+        spring.json.type.mapping: event:com.documind.common.events.DocumentIngestedEvent
+
+server:
+  port: 8081
+
+file:
+  upload-dir: /tmp/documind-uploads

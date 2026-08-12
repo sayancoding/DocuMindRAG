@@ -146,15 +146,6 @@ public class GatewayIngestController {
                 .map(el -> ResponseEntity.ok(el.documents()));
     }
 
-    @DeleteMapping("/documents/{id}")
-    Mono<ResponseEntity<String>> deleteDocument(@PathVariable String id){
-        return ragCoreWebClient.delete()
-                .uri("/api/v1/documents/{id}",id)
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .toEntity(String.class);
-    }
-
     @GetMapping("/health")
     Mono<String> getHealthCheck(){
         return Mono.just("Running :: DocMind Gateway service is working....");

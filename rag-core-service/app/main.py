@@ -40,6 +40,7 @@ async def process_pdf_background(file_name: str, document_id: str, file_bytes: b
             # "blocks" layout mode preserves multi-column ordering and structural paths
             blocks = page.get_text("blocks")
             
+            full_text_accumulator.append(f"\n--- Page {page_num + 1} ---\n")
             for b in blocks:
                 text_block = b[4].strip()
                 if text_block:

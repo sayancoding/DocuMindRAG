@@ -2,11 +2,11 @@ import os
 import chromadb
 from google import genai
 from dotenv import load_dotenv
-from config import CHROMA_HOST, CHROMA_PORT
+from app.config import settings
 
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = settings.GEMINI_API_KEY
 
 if not api_key:
     raise ValueError("❌ CRITICAL ERROR: GEMINI_API_KEY environment variable is missing!")
@@ -31,9 +31,9 @@ class NativeGeminiEmbedder:
 embedding_model = NativeGeminiEmbedder()
 
 # 3. Establish the internal container-to-container connection channel
-chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=int(CHROMA_PORT))
+chroma_client = chromadb.HttpClient(host=settings.CHROMA_HOST, port=int(settings.CHROMA_PORT))
 
-def get_or_create_collection(collection_name: str = "documind_child_chunks"):
+def get_chroma_collection(collection_name: str = "documind_child_chunks"):
     return chroma_client.get_or_create_collection(
         name=collection_name,
         metadata={"hnsw:space": "cosine"}
