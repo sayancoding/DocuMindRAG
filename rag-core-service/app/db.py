@@ -1,22 +1,25 @@
 import psycopg
 
-from config import POSTGRES_DB_PARAMS
+from app.config import POSTGRES_DB_PARAMS
 
 def get_db_connection():
     """Returns a fresh connection to the PostgreSQL instance."""
     return psycopg.connect(**POSTGRES_DB_PARAMS)
 
-def update_document_status(document_id: str, status: str):
-    """Updates the status of a document in the database."""
+def update_document_status(document_id: str, status: str, error_msg: str = None):
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE documents SET status = %s WHERE id = %s",
-                    (status, document_id)
-                )
-                conn.commit()
-                print(f"[DB] Successfully updated document [{document_id}] status to {status}")
+            with conn.cursor() as cursor:
+                if error_msg:
+                    cursor.execute(
+                        "UPDATE documents SET status = %s, error_message = %s, updated_at = NOW() WHERE id = %s;",
+                        (status, error_msg, document_id)
+                    )
+                else:
+                    cursor.execute(
+                        "UPDATE documents SET status = %s, updated_at = NOW() WHERE id = %s;",
+                        (status, document_id)
+                    )
+            conn.commit()
     except Exception as e:
-        print(f"[DB] Error updating document [{document_id}] status: {e}")
-            
+        print(f"[DB Error] Failed to update doc {document_id}: {e}")

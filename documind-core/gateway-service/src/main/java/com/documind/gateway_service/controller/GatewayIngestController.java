@@ -31,7 +31,7 @@ import reactor.core.publisher.Sinks;
 public class GatewayIngestController {
 
     @Autowired
-    private WebClient ragCoreWebClient;
+    private WebClient ingestionServiceClient;
 
     // Sinks map matching an individual file session to a reactive broadcast channel
     private final Map<String, Sinks.Many<Map<String,Object>>> sessionSinks = new ConcurrentHashMap<>();
@@ -54,17 +54,17 @@ public class GatewayIngestController {
                     sessionSinks.putIfAbsent(filePart.filename(), Sinks.many().multicast().onBackpressureBuffer());
 
                     // 3. Post downstream to the FastAPI core service
-                    return ragCoreWebClient.post()
+                    return ingestionServiceClient.post()
                             .uri("/api/v1/ingest/upload")
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .body(BodyInserters.fromMultipartData(bodyBuilder.build()))
                             .retrieve()
                             .toEntity(String.class);
                 })
-                // 4. Exception fallback handling if FastAPI is down
+                // 4. Exception fallback handling if ingestion service is down
                 .onErrorResume(error -> Mono.just(
                         ResponseEntity.status(500)
-                                .body("❌ Gateway Routing Failure: Downstream AI Core is unreachable. Details: " + error.getMessage())
+                                .body("❌ Gateway Routing Failure: Downstream Ingestion Service is unreachable. Details: " + error.getMessage())
                 ));
     }
 
@@ -77,7 +77,7 @@ public class GatewayIngestController {
         }
 
         // Forward JSON payload directly to FastAPI's query engine endpoint
-        return ragCoreWebClient.post()
+        return ingestionServiceClient.post()
                 .uri("/api/v1/query")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(queryPayload)
@@ -138,7 +138,7 @@ public class GatewayIngestController {
 
     @GetMapping ("/documents")
     Mono<ResponseEntity<List<DocumentDto>>> getAllDocs(){
-        return ragCoreWebClient.get()
+        return ingestionServiceClient.get()
                 .uri("/api/v1/documents")
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()

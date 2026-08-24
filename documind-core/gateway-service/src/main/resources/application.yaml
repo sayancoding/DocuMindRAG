@@ -13,7 +13,7 @@ spring:
     show-sql: true
 
 server:
-  port: 8081
+  port: 8080
 
   servlet:
     multipart:
@@ -22,3 +22,7 @@ server:
 #      max-request-size: 10MB
 #  codec:
 #    max-in-memory-size: 10MB
+
+service:
+  ingestion:
+    url: http://localhost:8081

@@ -5,7 +5,7 @@ pydantic
 python-multipart
 
 # Event Streaming / Kafka
-kafka-python-ng
+confluent-kafka
 
 # LLM Orchestration & Google Ecosystem
 langchain

@@ -35,6 +35,9 @@ public class DocumentEntity {
     @Column(nullable = false)
     private DocumentStatus status;
 
+    @Column(name = "error_message")
+    private String errorMessage;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

@@ -8,13 +8,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class GatewayConfig {
 
-    @Value("${rag.core.url:http://localhost:8080}")
-    private String ragCoreUrl;
+    @Value("${rag.core.url:http://localhost:8081}")
+    private String ingestionServiceUrl;
 
     @Bean
-    public WebClient ragCoreWebClient(){
+    public WebClient ingestionServiceClient(){
         return WebClient.builder()
-                .baseUrl(ragCoreUrl)
+                .baseUrl(ingestionServiceUrl)
                 .codecs(config -> config
                         .defaultCodecs()
                         .maxInMemorySize(16 * 1024 * 1024))
