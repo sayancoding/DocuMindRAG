@@ -1,7 +1,9 @@
 package com.documind.gateway_service.controller;
 
+import com.documind.common.enums.DocumentStatus;
 import com.documind.gateway_service.dto.DocumentDto;
 import com.documind.gateway_service.dto.DocumentResponse;
+import com.documind.gateway_service.dto.DocumentStatusUpdate;
 import com.documind.gateway_service.dto.QueryRequest;
 
 import lombok.extern.slf4j.Slf4j;
@@ -28,16 +30,18 @@ import reactor.core.publisher.Sinks;
 @RequestMapping("/api/gateway")
 @CrossOrigin(origins = "*")
 @Slf4j
-public class GatewayIngestController {
+public class GatewayController {
 
     @Autowired
     private WebClient ingestionServiceClient;
 
     // Sinks map matching an individual file session to a reactive broadcast channel
-    private final Map<String, Sinks.Many<Map<String,Object>>> sessionSinks = new ConcurrentHashMap<>();
+    private final Map<String, Sinks.Many<DocumentStatusUpdate>> sessionSinks = new ConcurrentHashMap<>();
 
     @PostMapping(value = "/ingest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Mono<ResponseEntity<String>> proxyDocumentUpload(@RequestPart("file") Mono<FilePart> filePartMono) {
+    public Mono<ResponseEntity<String>> proxyDocumentUpload(
+            @RequestPart("file") Mono<FilePart> filePartMono,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
         return filePartMono
                 // 1. Intercept the file part reactively
@@ -55,7 +59,8 @@ public class GatewayIngestController {
 
                     // 3. Post downstream to the FastAPI core service
                     return ingestionServiceClient.post()
-                            .uri("/api/v1/ingest/upload")
+                            .uri("/api/v1/documents/upload")
+                            .header("X-User-Id",userId)
                             .contentType(MediaType.MULTIPART_FORM_DATA)
                             .body(BodyInserters.fromMultipartData(bodyBuilder.build()))
                             .retrieve()
@@ -93,8 +98,8 @@ public class GatewayIngestController {
      * 2. SSE WebFlux Stream Route: Angular opens connection here to stream live events
      */
     @GetMapping(value = "/stream/{fileName}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<Map<String, Object>>> streamProcessingStatus(@PathVariable String fileName) {
-        Sinks.Many<Map<String, Object>> sink = sessionSinks.get(fileName);
+    public Flux<ServerSentEvent<DocumentStatusUpdate>> streamProcessingStatus(@PathVariable String fileName) {
+        Sinks.Many<DocumentStatusUpdate> sink = sessionSinks.get(fileName);
         
         if (sink == null) {
             return Flux.empty();
@@ -102,7 +107,7 @@ public class GatewayIngestController {
 
         // Convert our reactive Sink channel directly into a live Flux event output stream
         return sink.asFlux()
-                .map(data -> ServerSentEvent.<Map<String, Object>>builder()
+                .map(data -> ServerSentEvent.<DocumentStatusUpdate>builder()
                         .event("status-update")
                         .data(data)
                         .build())
@@ -114,17 +119,17 @@ public class GatewayIngestController {
      * Callback endpoint - Get push update from python about file processing.
      */
     @PostMapping("/status-callback")
-    public Mono<Void> handleStatusCallback(@RequestBody Map<String, Object> statusPayload) {
+    public Mono<Void> handleStatusCallback(@RequestBody DocumentStatusUpdate update) {
         // Log the received status payload for monitoring
-        log.info("## Received status callback: {}", statusPayload);
-        String fileName = (String) statusPayload.get("fileName");
-        String stage = (String) statusPayload.get("stage");
+        log.info("## Received status callback: {}", update);
+        String fileName = (String) update.fileName();
+        String stage = (String) update.stage();
 
-        Sinks.Many<Map<String, Object>> sink = sessionSinks.get(fileName);
+        Sinks.Many<DocumentStatusUpdate> sink = sessionSinks.get(fileName);
         if(sink != null) {
-            sink.tryEmitNext(statusPayload);
+            sink.tryEmitNext(update);
 
-            if("completed".equalsIgnoreCase(stage) || "failed".equalsIgnoreCase(stage)) {
+            if(DocumentStatus.UPLOADED.toString().equalsIgnoreCase(stage) || DocumentStatus.FAILED.toString().equalsIgnoreCase(stage)) {
                 sink.tryEmitComplete();
                 sessionSinks.remove(fileName);
             }

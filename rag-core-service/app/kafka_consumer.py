@@ -45,13 +45,14 @@ def start_kafka_listener():
                 
                 doc_id = event.get('documentId')
                 file_path = event.get('filePath')
+                file_name = event.get('fileName')
 
                 print(f"\n[Kafka Consumer] 📥 Consumed event for documentId: {doc_id}")
                 
                 # 2. Trigger the actual RAG pipeline
-                if doc_id and file_path:
-                    process_and_embed_document(file_path, doc_id)
-                    print(f"[Kafka Consumer] 🚀 Triggering RAG pipeline for documentId: {doc_id} path: {file_path}")
+                if doc_id and file_path and file_name:
+                    process_and_embed_document(file_path, doc_id, file_name)
+                    print(f"[Kafka Consumer] 🚀 Triggering RAG pipeline for documentId: {doc_id} path: {file_path} name: {file_name}")
                 else:
                     print(f"[Kafka Consumer Warning] Invalid payload: {event}")
 
