@@ -66,7 +66,6 @@ def process_and_embed_document(document_path: str, document_id: str, file_name: 
         doc.close()
         full_text = "\n\n".join(full_text_accumulator)
 
-
         if not full_text.strip():
             raise ValueError("PDF content is empty or unreadable.")
 
@@ -81,7 +80,6 @@ def process_and_embed_document(document_path: str, document_id: str, file_name: 
                 for idx, parent_chunk in enumerate(parent_docs):
                     parent_id = str(uuid.uuid4())
                     print(f"[RAG] Generated Parent Chunk ID: {parent_id} for chunk {idx + 1}/{len(parent_docs)}")
-
 
                     cursor.execute(
                         """
@@ -119,7 +117,7 @@ def process_and_embed_document(document_path: str, document_id: str, file_name: 
                 documents=chroma_documents,
                 metadatas=chroma_metadatas
             )
-        update_document_status(document_id, "COMPLETED")
+        update_document_status(document_id, "EMBEDDED")
         push_status_to_gateway(document_id, file_name, document_path, 100, "completed", "Document processing and embedding completed successfully.")            
         print(f"✅ [RAG] Hierarchical parsing complete for document {document_id}")
 
@@ -127,7 +125,3 @@ def process_and_embed_document(document_path: str, document_id: str, file_name: 
         print(f"[RAG] Error processing document {document_path}: {e}")
         update_document_status(document_id, "FAILED", str(e)[:200])
         push_status_to_gateway(document_id, file_name, document_path, 100, "failed", f"Error processing document {document_path}: {str(e)[:50]}")
-
-
-def retrieve_and_generate(query: str, document_id: str) -> str:
-    return None

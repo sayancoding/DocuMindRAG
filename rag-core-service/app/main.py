@@ -1,10 +1,12 @@
+from http.client import HTTPException
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
 from app.model import QueryRequest
-from app.rag_engine import retrieve_and_generate
 from app.kafka_consumer import run_kafka_listener_in_thread
+from app.query_engine import hybrid_search_and_rerank
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,7 +35,7 @@ async def ask_document(payload: QueryRequest):
         raise HTTPException(status_code=400, detail="Query text cannot be empty.")
         
     try:
-        answer = retrieve_and_generate(payload.query, payload.documentId)
+        answer = hybrid_search_and_rerank(payload.query, payload.documentId)
         return {
             "query": payload.query,
             "answer": answer

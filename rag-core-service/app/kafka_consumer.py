@@ -1,6 +1,5 @@
 import json
 import threading
-import asyncio
 from confluent_kafka import Consumer, KafkaError
 from app.config import settings
 from app.rag_engine import process_and_embed_document

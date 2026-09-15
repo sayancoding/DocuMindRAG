@@ -1,5 +1,5 @@
-import os
-import psycopg2
+from typing import Dict, List
+import psycopg
 
 from dotenv import load_dotenv
 from google import genai
@@ -16,7 +16,7 @@ gemini_client = genai.Client()
 ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2", cache_dir="/tmp/flashrank")
 
 def get_db_connection():
-    return psycopg2.connect(**POSTGRES_DB_PARAMS)
+    return psycopg.connect(**POSTGRES_DB_PARAMS)
 
 def hybrid_search_and_rerank(user_query: str, documentId: str = None):
     """
@@ -93,7 +93,7 @@ def hybrid_search_and_rerank(user_query: str, documentId: str = None):
     
     return response.text
 
-def calculate_rrf_score(chunks:list, k: int = 60) -> float:
+def calculate_rrf_score(chunks:list, k: int = 60) -> list:
     """
     Calculate the Reciprocal Rank Fusion (RRF) score for a given rank.
     RRF score is defined as 1 / (k + rank), where k is a constant to dampen the effect of rank.
@@ -115,8 +115,8 @@ def calculate_rrf_score(chunks:list, k: int = 60) -> float:
         rrf_score_map[chunk_id] += 1.0 / (k + rank + 1)
 
     # Pass 3: Attach & Final Sort
-    for chunk in child_chunks:
-        chunk["rrf_score"] = rrf_scores_map[chunk["chunk_id"]]
+    for chunk in chunks:
+        chunk["rrf_score"] = rrf_score_map[chunk["id"]]
 
     final_ranked_chunks = sorted(chunks, key=lambda x: x["rrf_score"], reverse=True)
     return final_ranked_chunks
@@ -128,8 +128,8 @@ def execute_flashrank_rerank(user_query: str, fushed_results: list, top_k: int =
     """
     # logic for FlashRank re-ranking
     passage = []
-    for chunk in fused_results:
-        passages.append({
+    for chunk in fushed_results:
+        passage.append({
             "id": chunk["id"], 
             "text": chunk["content"], 
             "meta": {
@@ -137,21 +137,23 @@ def execute_flashrank_rerank(user_query: str, fushed_results: list, top_k: int =
             }
         })
 
-    rerank_request = RerankRequest(query=user_query,passages=passages)
+    rerank_request = RerankRequest(query=user_query,passages=passage)
     rerank_response = ranker.rerank(rerank_request)
 
     seen_parent_ids = set()
+    selected_parent_ids = []
 
     for res in rerank_response:
-        pid = res.passage[meta]["parent_id"]
+        pid = res["meta"]["parent_id"]
 
         if pid not in seen_parent_ids:
             seen_parent_ids.add(pid)
+            selected_parent_ids.append(pid)
         
         if len(seen_parent_ids) >= top_k:
             break
 
-    return list(seen_parent_ids)
+    return selected_parent_ids
 
 def fetch_parent_contexts(parent_ids: List[str]) -> Dict[str, str]:
     """
@@ -192,4 +194,12 @@ def fetch_parent_contexts(parent_ids: List[str]) -> Dict[str, str]:
     except psycopg2.Error as e:
         print(f"Database error while fetching parent chunks: {e}")
         
-    return parent_map
+    final_records = []
+    for pid in parent_ids:
+        if pid in parent_map:
+            final_records.append({
+                "parent_id": pid,
+                "content": parent_map[pid]
+            })
+            
+    return final_records

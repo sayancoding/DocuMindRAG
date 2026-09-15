@@ -7,5 +7,6 @@ public enum DocumentStatus {
     CHUNKED,
     EMBEDDED,
     INDEXED,
-    FAILED
+    FAILED,
+    COMPLETED
 }
