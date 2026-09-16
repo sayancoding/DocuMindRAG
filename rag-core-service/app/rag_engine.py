@@ -7,6 +7,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.vector_store import get_chroma_collection, embedding_model
 from app.db import update_document_status, get_db_connection
+from app.kafka_producer import send_to_dlq
 
 chroma_client = get_chroma_collection()
 httpx_client = httpx.Client()
@@ -35,7 +36,7 @@ def push_status_to_gateway(document_id: str, file_name: str, path:str, progress:
         print(f"[Gateway Callback] ❌ Failed to deliver SSE status callback: {e}")
 
 # Define the main function to process and embed document
-def process_and_embed_document(document_path: str, document_id: str, file_name: str):
+def process_and_embed_document(document_path: str, document_id: str, file_name: str, raw_event:str):
     """Processes a PDF document, extracts text, generates embeddings, and stores them in ChromaDB."""
     print(f"[RAG Engine] Starting to process document: {document_path} with ID: {document_id}")
     
@@ -123,5 +124,6 @@ def process_and_embed_document(document_path: str, document_id: str, file_name: 
 
     except Exception as e:
         print(f"[RAG] Error processing document {document_path}: {e}")
-        update_document_status(document_id, "FAILED", str(e)[:200])
+        # update_document_status(document_id, "FAILED", str(e)[:200])
+        send_to_dlq(original_payload=raw_event, exception=e, document_id=document_id)
         push_status_to_gateway(document_id, file_name, document_path, 100, "failed", f"Error processing document {document_path}: {str(e)[:50]}")

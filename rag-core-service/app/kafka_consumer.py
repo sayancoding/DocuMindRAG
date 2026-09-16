@@ -1,8 +1,11 @@
 import json
 import threading
 from confluent_kafka import Consumer, KafkaError
+import psycopg
 from app.config import settings
 from app.rag_engine import process_and_embed_document
+from app.db import get_db_connection
+from app.kafka_producer import send_to_dlq
 
 def start_kafka_listener():
     print(f"[Kafka Consumer] Listening to topic '{settings.KAFKA_TOPIC_DOCUMENT_INGESTED}'...")
@@ -47,16 +50,23 @@ def start_kafka_listener():
                 file_name = event.get('fileName')
 
                 print(f"\n[Kafka Consumer] 📥 Consumed event for documentId: {doc_id}")
+
+                # to maintain idempotency
+                if is_duplicate_document(doc_id):
+                    print(f"[Kafka] Ignoring duplicate message for Doc {doc_id}")
+                    consumer.commit(msg)
+                    continue
                 
                 # 2. Trigger the actual RAG pipeline
                 if doc_id and file_path and file_name:
-                    process_and_embed_document(file_path, doc_id, file_name)
+                    process_and_embed_document(file_path, doc_id, file_name,raw_value)
                     print(f"[Kafka Consumer] 🚀 Triggering RAG pipeline for documentId: {doc_id} path: {file_path} name: {file_name}")
                 else:
                     print(f"[Kafka Consumer Warning] Invalid payload: {event}")
 
-            except json.JSONDecodeError as e:
+            except Exception as e:
                 print(f"[Kafka Consumer Error] Failed to parse JSON: {msg.value()} -> {e}")
+                send_to_dlq({"raw_content" : raw_value}, e)
 
     except Exception as fatal_e:
         print(f"[Kafka Consumer FATAL] Thread crashed: {fatal_e}")
@@ -66,3 +76,22 @@ def start_kafka_listener():
 def run_kafka_listener_in_thread():
     listener_thread = threading.Thread(target=start_kafka_listener, daemon=True)
     listener_thread.start()
+
+def is_duplicate_document(document_id):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "select status from documents where id = %s",
+                    (document_id)
+                )
+                row = cursor.fetchone()
+
+                if row is not None :
+                    return True
+
+                return False
+                
+    except psycopg.Error as e:
+        print(f"[Idempotency Error] DB check failed: {e}")
+        return True

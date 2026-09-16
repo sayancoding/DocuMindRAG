@@ -8,6 +8,8 @@ class Settings:
     KAFKA_TOPIC_DOCUMENT_INGESTED: str = os.getenv("KAFKA_TOPIC_DOCUMENT_INGESTED", "document-ingestion-events")
     KAFKA_CONSUMER_GROUP: str = os.getenv("KAFKA_CONSUMER_GROUP", "rag-core-group")
 
+    KAFKA_TOPIC_DOC_DLQ:str = os.getenv("KAFKA_TOPIC_DOC_DLQ",'document-ingestion-dlq')
+
     DB_HOST: str = os.getenv("DB_HOST", "localhost")
     DB_PORT: int = int(os.getenv("DB_PORT", 5432))
     DB_NAME: str = os.getenv("DB_NAME", "documind_metadata")
