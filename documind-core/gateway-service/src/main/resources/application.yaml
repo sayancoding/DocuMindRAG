@@ -26,3 +26,5 @@ server:
 service:
   ingestion:
     url: http://localhost:8081
+  ragCore:
+    url: http://localhost:8082

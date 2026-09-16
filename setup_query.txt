@@ -15,7 +15,7 @@ CREATE TABLE documents (
 -- 2. Meta Table tracking structural layout properties of parent context blocks
 CREATE TABLE document_parents (
     id UUID PRIMARY KEY,
-    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    document_id VARCHAR(255) REFERENCES documents(id) ON DELETE CASCADE,
     parent_index INT NOT NULL, -- Sequential order of parent block within the document
     raw_content TEXT NOT NULL,  -- High-fidelity large text window passed to Gemini 2.5 Flash
     page_start INT,

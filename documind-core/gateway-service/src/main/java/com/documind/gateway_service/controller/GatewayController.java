@@ -34,6 +34,8 @@ public class GatewayController {
 
     @Autowired
     private WebClient ingestionServiceClient;
+    @Autowired
+    private WebClient ragCoreServiceClient;
 
     // Sinks map matching an individual file session to a reactive broadcast channel
     private final Map<String, Sinks.Many<DocumentStatusUpdate>> sessionSinks = new ConcurrentHashMap<>();
@@ -82,7 +84,7 @@ public class GatewayController {
         }
 
         // Forward JSON payload directly to FastAPI's query engine endpoint
-        return ingestionServiceClient.post()
+        return ragCoreServiceClient.post()
                 .uri("/api/v1/query")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(queryPayload)
